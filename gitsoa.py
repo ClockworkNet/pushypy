@@ -1,5 +1,5 @@
 #! /usr/bin/python
-import os, time, sys, re
+import os, time, sys, re, logging
 
 class FileMonitor(object):
 
@@ -7,37 +7,60 @@ class FileMonitor(object):
         self.delay   = 1
         self.dirs    = {}
         self.files   = {}
-        self.ignored = re.compile("^\.", re.I)
+        self.ignored_dirs = re.compile("\.git", re.I)
+        self.ignored_files = re.compile("\.swp$", re.I)
 
 
-    def add_dir(self, dir):
-        dir = os.path.abspath(dir)
-        if not os.path.exists(dir) or not os.path.isdir(dir):
-            print "Bad dir path: ", dir
-            return
-        if self.should_ignore(dir):
-            print "skipping ", dir 
-            return
-        self.dirs[dir] = os.stat(dir).st_mtime
-        entries = os.listdir(dir)
-        for entry in entries:
-            entry = os.path.join(dir, entry)
-            if os.path.isdir(entry):
-                self.add_dir(entry)
-            else:
-                self.add_file(entry)
-
-    def add_file(self, path):
-        if not os.path.exists(path) or not os.path.exists(path):
-            print "Bad file path: ", path
-            return
-        path = os.path.abspath(path)
-        self.files[path] = os.stat(path).st_mtime
+    def track(self, source):
+        for root, dirs, files in os.walk(source):
+            for dir in dirs:
+                dir_path = os.path.join(root, dir)
+                self.add_dir(dir_path)
+            for file in files:
+                file_path = os.path.join(root, file)
+                self.add_file(file_path)
+        self.info("Tracking directories", self.dirs)
+        self.info("Tracking files", self.files)
 
 
     def should_ignore(self, path):
-        base = os.path.basename(path)
-        return re.match(self.ignored, base)
+
+        path = os.path.abspath(path)
+        if not os.path.exists(path):
+            self.warn("ignored, path doesn't exist", path)
+            return True
+        elif re.search(self.ignored_dirs, path):
+            self.info("ignored, matches dir pattern", path)
+            return True
+        elif os.path.isdir(path):
+            self.info("okay, doesn't match dir pattern and is a directory", path)
+            return False
+        elif re.search(self.ignored_files, path):
+            self.info("ignored, matches file pattern", path)
+            return True
+        else:
+            return False 
+
+
+
+    def add_dir(self, dir, trigger_event = False):
+        dir = os.path.abspath(dir)
+        if not os.path.isdir(dir):
+            return
+        if self.should_ignore(dir):
+            return
+        self.dirs[dir] = os.stat(dir).st_mtime
+        if trigger_event:
+            self.dir_changed(dir, 'added')
+
+
+    def add_file(self, path, trigger_event = False):
+        path = os.path.abspath(path)
+        if self.should_ignore(path):
+            return
+        self.files[path] = os.stat(path).st_mtime
+        if trigger_event:
+            self.file_changed(path, 'added')
 
 
     def start(self):
@@ -70,14 +93,10 @@ class FileMonitor(object):
         entries = os.listdir(path)
         for entry in entries:
             entry = os.path.join(path, entry)
-            if self.should_ignore(entry):
-                continue
             if not os.path.isdir(entry) and not entry in self.files.keys():
-                self.add_file(entry)
-                self.file_changed(entry, 'added')
+                self.add_file(entry, trigger_event = True)
             elif os.path.isdir(entry) and not entry in self.dirs.keys():
-                self.add_dir(entry)
-                self.dir_changed(entry, 'added')
+                self.add_dir(entry, trigger_event = True)
 
 
     def file_changed(self, path, action):
@@ -88,10 +107,21 @@ class FileMonitor(object):
         print "Dir ", path, action
 
 
+    def error(self, msg, *args):
+        print "ERROR: " + msg, args
+
+    def warn(self, msg, *args):
+        print "WARN: " + msg, args
+
+    def info(self, msg, *args):
+        print "INFO: " + msg, args
+
+
 def main(args):
-    fm = FileMonitor()
     dir = args[0] if len(args) > 0 else "./"
-    fm.add_dir(dir)
+    fm = FileMonitor()
+
+    fm.track(dir)
     fm.start()
 
 if __name__ == "__main__":
