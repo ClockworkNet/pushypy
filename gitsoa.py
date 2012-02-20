@@ -156,11 +156,18 @@ class GitPush(object):
         if not self.commit("Saving for export to %s" % self.target):
             return
         # @TODO: implement this
+        destination = os.path.join(self.target, "backup.zip")
+        self.call("git archive --format=zip --output=%s" % destination)
 
 
     def call(self, cmd):
         print "calling '%s'" % cmd
-        r = subprocess.call(cmd, shell=True)
+        try:
+            r = subprocess.call(cmd, shell=True)
+            return True
+        except:
+            logging.error("Error calling command '%s'" % cmd)
+            return False
 
 
 class Main(object):
