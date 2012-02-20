@@ -166,7 +166,6 @@ class GitPush(object):
             r = subprocess.call(cmd, shell=True)
             return True
         except:
-            print "Error!"
             logging.error("Error calling command '%s'" % cmd)
             return False
 
