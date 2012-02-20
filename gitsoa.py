@@ -1,14 +1,18 @@
 #! /usr/bin/python
-import os, time, sys, re, logging
+import os, time, sys, re, logging, subprocess
 
 class FileMonitor(object):
 
-    def __init__(self):
+    def __init__(self, root):
         self.delay   = 1
         self.dirs    = {}
         self.files   = {}
-        self.ignored_dirs = re.compile("\.git", re.I)
+        self.root    = root 
+        self.file_changed  = Event()
+        self.dir_changed   = Event()
+        self.ignored_dirs  = re.compile("\.git", re.I)
         self.ignored_files = re.compile("\.swp$", re.I)
+        self.track(root)
 
 
     def track(self, source):
@@ -24,7 +28,6 @@ class FileMonitor(object):
 
 
     def should_ignore(self, path):
-
         path = os.path.abspath(path)
         if not os.path.exists(path):
             logging.warn("ignored, path doesn't exist", path)
@@ -40,7 +43,6 @@ class FileMonitor(object):
             return True
         else:
             return False 
-
 
 
     def add_dir(self, dir, trigger_event = False):
@@ -77,7 +79,6 @@ class FileMonitor(object):
             del self.files[path]
             self.file_changed(path, 'deleted')
             return
-
         modified = os.stat(path).st_mtime
         if last_modified != modified:
             self.files[path] = modified
@@ -99,20 +100,91 @@ class FileMonitor(object):
                 self.add_dir(entry, trigger_event = True)
 
 
-    def file_changed(self, path, action):
-        print "File ", path, action
+class Event(object):
+    def __init__(self):
+        self.handlers = set()
+
+    def handle(self, handler):
+        self.handlers.add(handler)
+        return self
+
+    def unhandle(self, handler):
+        try:
+            self.handlers.remove(handler)
+        except:
+            raise ValueError("Handler is not handling this event, so cannot unhandle it.")
+        return self
+
+    def fire(self, *args, **kargs):
+        for handler in self.handlers:
+            handler(*args, **kargs)
+
+    def getHandlerCount(self):
+        return len(self.handlers)
+
+    __add__  = handle
+    __sub__  = unhandle
+    __call__ = fire
+    __len__  = getHandlerCount
 
 
-    def dir_changed(self, path, action):
-        print "Dir ", path, action
+class GitPush(object):
+
+    def __init__(self, source, target):
+        self.source = source
+        self.target = target
 
 
-def main(args):
-    dir = args[0] if len(args) > 0 else "./"
-    fm = FileMonitor()
+    def add(self, item):
+        path = os.path.abspath(item)
+        if os.path.exists(path):
+            self.call("git add %s" % path)
+        else:
+            logging.error("File doesn't exist for adding", path)
 
-    fm.track(dir)
-    fm.start()
+
+    def remove(self, item):
+        path = os.path.abspath(item)
+        self.call("git rm %s" % path)
+
+
+    def commit(self, msg):
+        self.call('git commit -a -m "%s"' % msg.replace('"', '\\"'))
+
+
+    def export(self):
+        if not self.commit("Saving for export to %s" % self.target):
+            return
+        # @TODO: implement this
+
+
+    def call(self, cmd):
+        print "calling '%s'" % cmd
+        r = subprocess.call(cmd, shell=True)
+        print r
+
+
+class Main(object):
+    def __init__(self, args):
+        dir    = os.path.abspath(args[0])
+
+        self.monitor = FileMonitor(dir)
+        self.monitor.file_changed += self.handle_change
+        self.monitor.dir_changed  += self.handle_change
+
+        if len(args) > 1:
+            target = os.path.abspath(args[1])
+            self.pusher = GitPush(dir, target)
+
+        self.monitor.start()
+
+    def handle_change(self, path, action):
+        print "file changed", path, action
+        if action == "deleted":
+            self.pusher.remove(path)
+        else:
+            self.pusher.add(path)
+        self.pusher.export()
 
 if __name__ == "__main__":
-    main(sys.argv[1:])
+    Main(sys.argv[1:])
