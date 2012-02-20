@@ -19,24 +19,24 @@ class FileMonitor(object):
             for file in files:
                 file_path = os.path.join(root, file)
                 self.add_file(file_path)
-        self.info("Tracking directories", self.dirs)
-        self.info("Tracking files", self.files)
+        logging.info("Tracking directories", self.dirs)
+        logging.info("Tracking files", self.files)
 
 
     def should_ignore(self, path):
 
         path = os.path.abspath(path)
         if not os.path.exists(path):
-            self.warn("ignored, path doesn't exist", path)
+            logging.warn("ignored, path doesn't exist", path)
             return True
         elif re.search(self.ignored_dirs, path):
-            self.info("ignored, matches dir pattern", path)
+            logging.info("ignored, matches dir pattern", path)
             return True
         elif os.path.isdir(path):
-            self.info("okay, doesn't match dir pattern and is a directory", path)
+            logging.info("okay, doesn't match dir pattern and is a directory", path)
             return False
         elif re.search(self.ignored_files, path):
-            self.info("ignored, matches file pattern", path)
+            logging.info("ignored, matches file pattern", path)
             return True
         else:
             return False 
@@ -105,16 +105,6 @@ class FileMonitor(object):
 
     def dir_changed(self, path, action):
         print "Dir ", path, action
-
-
-    def error(self, msg, *args):
-        print "ERROR: " + msg, args
-
-    def warn(self, msg, *args):
-        print "WARN: " + msg, args
-
-    def info(self, msg, *args):
-        print "INFO: " + msg, args
 
 
 def main(args):
