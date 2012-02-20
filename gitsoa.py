@@ -161,7 +161,6 @@ class GitPush(object):
     def call(self, cmd):
         print "calling '%s'" % cmd
         r = subprocess.call(cmd, shell=True)
-        print r
 
 
 class Main(object):
