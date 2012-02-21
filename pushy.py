@@ -1,5 +1,6 @@
 #! /usr/bin/python
 import os, time, sys, re, logging, shutil
+from optparse import OptionParser
 
 class FileMonitor(object):
 
@@ -33,13 +34,13 @@ class FileMonitor(object):
             logging.warn("ignored, path %s doesn't exist" % path)
             return True
         elif re.search(self.ignored_dirs, path):
-            logging.info("ignored, path %s matches dir pattern" % path)
+            logging.debug("ignored, path %s matches dir pattern" % path)
             return True
         elif os.path.isdir(path):
-            logging.info("okay, path %s doesn't match dir pattern and is a directory" % path)
+            logging.debug("okay, path %s doesn't match dir pattern and is a directory" % path)
             return False
         elif re.search(self.ignored_files, path):
-            logging.info("ignored, path %s matches file pattern" % path)
+            logging.debug("ignored, path %s matches file pattern" % path)
             return True
         else:
             return False 
@@ -153,7 +154,7 @@ class Pusher(object):
         target_path = self.determine_destination(item)
 
         if not os.path.exists(target_path):
-            logging.info("%s does not exist in target. Adding instead of updating." % item)
+            logging.debug("%s does not exist in target. Adding instead of updating." % item)
             self.add(item)
             return
 
@@ -182,14 +183,18 @@ class Pusher(object):
                 os.rmdir(target_path)
             else:
                 os.remove(target_path)
-        except Error, err:
+        except Exception as err:
             logging.error("Error occurred while removing %s: %s" % (item, str(err)))
 
 
     def push(self, source_path, target_path):
         try:
-            shutil.copy(source_path, target_path)
-        except Error, err:
+            target_dir = os.path.dirname(target_path)
+            if not os.path.exists(target_dir):
+                logging.info("Creating target directory %s before copying file." % target_dir)
+                os.mkdir(target_dir)
+            shutil.copy2(source_path, target_path)
+        except Exception as err:
             logging.error("Error ocurred while copying file: %s" % str(err))
 
 
@@ -201,21 +206,45 @@ class Pusher(object):
 
 
 class Main(object):
-    def __init__(self, args):
-        dir = os.path.abspath(args[0])
+    def __init__(self):
+        parser = OptionParser(description="Pushes filesystem changes to a target directory")
+        parser.add_option("-t", "--target",
+            help="The target directory.",
+            type="string"
+        )
+        parser.add_option("-s", "--source", 
+            help="The source directory. Default is current directory.",
+            default="./",
+            type="string"
+        )
+        parser.add_option("-l", "--log_level",
+            help="The logger level to use.",
+            type="int",
+            default=logging.INFO
+        )
+        options, args = parser.parse_args()
+
+        logging.basicConfig(level=options.log_level)
+        
+        dir = os.path.abspath(options.source)
 
         self.monitor = FileMonitor(dir)
         self.monitor.file_changed += self.handle_change
         self.monitor.dir_changed  += self.handle_change
 
-        if len(args) > 1:
-            target = os.path.abspath(args[1])
+        if options.target is not None:
+            target = os.path.abspath(options.target)
             self.pusher = Pusher(dir, target)
+        else:
+            print "You might want to specify a target directory."
+            self.pusher = None
 
         self.monitor.start()
 
     def handle_change(self, path, action):
-        print "file changed", path, action
+        logging.debug("Handling change event '%s' for path '%s'" % (action, path))
+        if self.pusher is None:
+            return
         if action == "deleted":
             self.pusher.remove(path)
         elif action == "added":
@@ -224,5 +253,4 @@ class Main(object):
             self.pusher.update(path)
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.DEBUG)
-    Main(sys.argv[1:])
+    Main()
