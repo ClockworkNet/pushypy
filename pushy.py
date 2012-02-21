@@ -94,7 +94,7 @@ class FileMonitor(object):
         # look for new files
         entries = os.listdir(path)
         for entry in entries:
-            entry = os.path.join(path, entry)
+            entry = os.path.abspath(os.path.join(path, entry))
             if not os.path.isdir(entry) and not entry in self.files.keys():
                 self.add_file(entry, trigger_event = True)
             elif os.path.isdir(entry) and not entry in self.dirs.keys():
@@ -142,10 +142,10 @@ class Pusher(object):
         if os.path.exists(target_path):
             logging.error("Skipping add for '%s': file already exists" % item)
         elif os.path.exists(source_path):
-            logging.info("Pushing %s to %s" % (source_path, target_path))
+            logging.info("Pushing %s to %s" % (item, self.target))
             self.push(source_path, target_path)
         else:
-            logging.error("Path %s doesn't exist for adding" % source_path)
+            logging.error("Path %s doesn't exist" % source_path)
 
 
     def update(self, item):
@@ -165,7 +165,7 @@ class Pusher(object):
             logging.warn("Skipping update of %s on target. Target file is more recent that source file." % item)
             return
 
-        logging.info("Updating %s to %s" % (source_path, target_path))
+        logging.info("Updating %s on %s" % (item, self.target))
         self.push(source_path, target_path)
 
 
@@ -176,7 +176,7 @@ class Pusher(object):
             logging.info("Skipping remove. Target file %s doesn't exist." % target_path)
             return
 
-        logging.info("Removing %s from %s" % (source_path, target_path))
+        logging.info("Removing %s" % target_path)
         
         try:
             if os.path.isdir(target_path):
@@ -184,7 +184,7 @@ class Pusher(object):
             else:
                 os.remove(target_path)
         except Exception as err:
-            logging.error("Error occurred while removing %s: %s" % (item, str(err)))
+            logging.error("Error occurred while removing %s: %s" % (target_path, str(err)))
 
 
     def push(self, source_path, target_path):
@@ -207,6 +207,7 @@ class Pusher(object):
 
 class Main(object):
     def __init__(self):
+
         parser = OptionParser(description="Pushes filesystem changes to a target directory")
         parser.add_option("-t", "--target",
             help="The target directory.",
