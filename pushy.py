@@ -2,7 +2,6 @@
 import logging, os
 
 from file_monitor import FileMonitor
-from event        import Event
 from pusher       import Pusher
 from optparse     import OptionParser
 
