@@ -1,5 +1,5 @@
 #! /usr/bin/python
-import logging, os
+import logging, os, yobject
 
 from file_monitor import FileMonitor
 from pusher       import Pusher
@@ -37,6 +37,11 @@ class Main(object):
 
     def parse_args(self):
         parser = OptionParser(description="Pushes filesystem changes to a target directory")
+        parser.add_option("--config-file",
+            dest="config_file",
+            help="A configuration file storing all options.",
+            type="string"
+        )
         parser.add_option("-t", "--target",
             help="The target directory.",
             type="string"
@@ -67,7 +72,12 @@ class Main(object):
             help="If a directory matches this regex, it is ignored.",
             type="string"
         )
-        return parser.parse_args()
+        options, args =  parser.parse_args()
+
+        if not options.config_file is None:
+            options  = yobject.load(options.config_file)
+
+        return [options, args]
 
 
     def handle_change(self, path, action):
