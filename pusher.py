@@ -1,4 +1,4 @@
-import os, logging, shutil
+import os, logging, shutil, pwd, subprocess
 
 
 class Pusher(object):
@@ -21,7 +21,6 @@ class Pusher(object):
 
 
     def update(self, item):
-
         source_path = os.path.abspath(item)
         target_path = self.determine_destination(item)
 
@@ -75,3 +74,24 @@ class Pusher(object):
         relative_path = os.path.relpath(abs_path, self.source)
         destination   = os.path.join(self.target, relative_path)
         return destination
+
+
+class ScpPusher(Pusher):
+
+    def __init__(self, source, target, hostname="", username=None):
+        super(ScpPusher, self).__init__(source, target)
+        self.hostname = hostname
+        if username is None:
+            username = pwd.getpwuid(os.getuid())[0]
+        self.username = username
+
+    def push(self, source_path, target_path):
+        p = subprocess.call(['scp', source_path, "%s@%s:%s" % (self.username, self.hostname, target_path)])
+
+    def remove(self, item):
+        target_path = self.determine_destination(item)
+        if os.path.isdir(target_path):
+            cmd = 'rm -rf'
+        else:
+            cmd = 'rm'
+        p = subprocess.call(['ssh', self.hostname, cmd, target_path])

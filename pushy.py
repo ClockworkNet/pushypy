@@ -1,5 +1,5 @@
 #! /usr/bin/python
-import logging, os, yobject
+import logging, os
 
 from file_monitor import FileMonitor
 from pusher       import Pusher
@@ -13,7 +13,7 @@ class Main(object):
 
         logging.basicConfig(level=options.log_level)
         
-        dir = os.path.abspath(options.source)
+        dir = os.path.abspath(options.source) if options.source is not None else './'
 
         self.monitor = FileMonitor(dir)
 
@@ -22,7 +22,7 @@ class Main(object):
         if not options.ignored_files is None:
             self.ignored_files = re.compile(options.ignored_files, re.I)
 
-        self.monitor.delay         = options.delay
+        self.monitor.delay         = options.delay if options.delay is not None else 1
         self.monitor.file_changed += self.handle_change
         self.monitor.dir_changed  += self.handle_change
 
@@ -37,19 +37,14 @@ class Main(object):
 
     def parse_args(self):
         parser = OptionParser(description="Pushes filesystem changes to a target directory")
-        parser.add_option("--config-file",
-            dest="config_file",
-            help="A configuration file storing all options.",
-            type="string"
-        )
         parser.add_option("-t", "--target",
             help="The target directory.",
             type="string"
         )
         parser.add_option("-s", "--source", 
             help="The source directory. Default is current directory.",
-            default="./",
-            type="string"
+            type="string",
+            default="./"
         )
         parser.add_option("-l", "--log-level",
             dest="log_level",
@@ -72,12 +67,8 @@ class Main(object):
             help="If a directory matches this regex, it is ignored.",
             type="string"
         )
-        options, args =  parser.parse_args()
 
-        if not options.config_file is None:
-            options  = yobject.load(options.config_file)
-
-        return [options, args]
+        return parser.parse_args()
 
 
     def handle_change(self, path, action):
