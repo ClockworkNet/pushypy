@@ -1,8 +1,8 @@
 #! /usr/bin/python
 import logging, os
 
+from pusher       import * 
 from file_monitor import FileMonitor
-from pusher       import Pusher
 from optparse     import OptionParser
 
 
@@ -10,8 +10,10 @@ class Main(object):
     def __init__(self):
 
         options, args = self.parse_args()
+        log_format    = "%(asctime)s - %(message)s"
+        date_format   = "%b %d, %H:%M:%S"
 
-        logging.basicConfig(level=options.log_level)
+        logging.basicConfig(format=log_format, datefmt=date_format, level=options.log_level)
         
         dir = os.path.abspath(options.source) if options.source is not None else './'
 
@@ -28,7 +30,10 @@ class Main(object):
 
         if options.target is not None:
             target = os.path.abspath(options.target)
-            self.pusher = Pusher(dir, target)
+            if options.username is not None and options.hostname is not None:
+                self.pusher = SshPusher(dir, target, options.hostname, options.username)
+            else:
+                self.pusher = Pusher(dir, target)
         else:
             print "You might want to specify a target directory. This script isn't very useful otherwise."
             self.pusher = None
@@ -45,6 +50,15 @@ class Main(object):
             help="The source directory. Default is current directory.",
             type="string",
             default="./"
+        )
+        parser.add_option("-u", "--username", 
+            help="A username. If supplied, files will be pushed via ssh.",
+            type="string"
+        )
+        parser.add_option("-r", "--remote-host",
+            dest="hostname",
+            help="The name of the host that will receive files. Used for ssh pushes.",
+            type="string"
         )
         parser.add_option("-l", "--log-level",
             dest="log_level",

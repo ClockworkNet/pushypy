@@ -76,10 +76,10 @@ class Pusher(object):
         return destination
 
 
-class ScpPusher(Pusher):
+class SshPusher(Pusher):
 
     def __init__(self, source, target, hostname="", username=None):
-        super(ScpPusher, self).__init__(source, target)
+        super(SshPusher, self).__init__(source, target)
         self.hostname = hostname
         if username is None:
             username = pwd.getpwuid(os.getuid())[0]
