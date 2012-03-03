@@ -1,9 +1,10 @@
 #! /usr/bin/python
-import logging, os
+import logging, os, sys
 
-from pusher       import * 
-from file_monitor import FileMonitor
-from optparse     import OptionParser
+from notify_handler import NotifyHandler
+from pusher         import * 
+from file_monitor   import FileMonitor
+from optparse       import OptionParser
 
 
 class Main(object):
@@ -14,6 +15,10 @@ class Main(object):
         date_format   = "%b %d, %H:%M:%S"
 
         logging.basicConfig(format=log_format, datefmt=date_format, level=options.log_level)
+
+        # Add notifications for Linux
+        logger = logging.getLogger()
+        logger.addHandler(NotifyHandler("Pushy"))
         
         dir = os.path.abspath(options.source) if options.source is not None else './'
 
