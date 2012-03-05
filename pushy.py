@@ -17,8 +17,10 @@ class Main(object):
         logging.basicConfig(format=log_format, datefmt=date_format, level=options.log_level)
 
         # Add notifications for Linux
+        notify_handler = NotifyHandler("Pushy")
+        notify_handler.setLevel(logging.INFO)
         logger = logging.getLogger()
-        logger.addHandler(NotifyHandler("Pushy"))
+        logger.addHandler(notify_handler)
         
         dir = os.path.abspath(options.source) if options.source is not None else './'
 
@@ -43,6 +45,7 @@ class Main(object):
             print "You might want to specify a target directory. This script isn't very useful otherwise."
             self.pusher = None
         self.monitor.start()
+        logging.info("Pushy started...")
 
 
     def parse_args(self):

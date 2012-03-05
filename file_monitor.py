@@ -23,7 +23,7 @@ class FileMonitor(object):
         self.dir_changed   = Event()
         self.file_changed += self.handle_file_changed
 
-        self.ignored_dirs  = re.compile("\.git", re.I)
+        self.ignored_dirs  = re.compile("\.(git|svn)", re.I)
         self.ignored_files = re.compile("\.swp$", re.I)
         self.track(root)
 
@@ -46,17 +46,22 @@ class FileMonitor(object):
             logging.debug("Removing hot file %s" % key)
 
 
-    def track(self, source):
-        self.add_dir(source)
-        for root, dirs, files in os.walk(source):
-            for dir in dirs:
-                dir_path = os.path.join(root, dir)
-                self.add_dir(dir_path)
-            for file in files:
-                file_path = os.path.join(root, file)
-                self.add_file(file_path)
-        logging.info("Tracking directories: %s" % ", ".join(self.dirs))
-        logging.info("Tracking files: %s" % ", ".join(self.files))
+    def track(self, dir):
+        if not os.path.exists(dir):
+            logging.error("Directory does not exist: %s" % dir)
+            return False
+        if not self.add_dir(dir):
+            return False
+        logging.debug("Tracking directory: %s" % dir)
+        entries = os.listdir(dir)
+        for entry in entries:
+            entry = os.path.abspath(os.path.join(dir, entry))
+            if not os.path.isdir(entry) and not entry in self.files.keys():
+                self.add_file(entry)
+                logging.debug("Tracking file: %s" % entry)
+            elif os.path.isdir(entry) and not entry in self.dirs.keys():
+                self.track(entry)
+        return True
 
 
     def should_ignore(self, path):
@@ -94,21 +99,23 @@ class FileMonitor(object):
     def add_dir(self, dir, trigger_event = False):
         dir = os.path.abspath(dir)
         if not os.path.isdir(dir):
-            return
+            return False
         if self.should_ignore(dir):
-            return
+            return False
         self.dirs[dir] = os.stat(dir).st_mtime
         if trigger_event:
             self.dir_changed(dir, 'added')
+        return True
 
 
     def add_file(self, path, trigger_event = False):
         path = os.path.abspath(path)
         if self.should_ignore(path):
-            return
+            return False
         self.files[path] = os.stat(path).st_mtime
         if trigger_event:
             self.file_changed(path, 'added')
+        return True
 
 
     def check_file(self, path, last_modified):

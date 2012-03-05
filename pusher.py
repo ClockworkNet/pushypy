@@ -34,6 +34,7 @@ class Pusher(object):
         source_mod  = os.stat(source_path).st_mtime
         target_mod  = os.stat(target_path).st_mtime
 
+        # Be polite. @todo: add a force option
         if target_mod > source_mod:
             logging.warn("Skipping update of %s on target. Target file is more recent that source file." % name)
             return
