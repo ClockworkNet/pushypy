@@ -3,16 +3,47 @@ from event import Event
 
 class FileMonitor(object):
 
+
     def __init__(self, root):
-        self.delay   = 1
-        self.dirs    = {}
-        self.files   = {}
-        self.root    = root 
+        self.delay     = 1
+        self.dirs      = {}
+        self.files     = {}
+        self.root      = root 
+
+        # "Hot" files are the most frequently updated ones
+        # The assumption is that a person will only be modifying
+        # a small subset of all the files being tracked.
+        # This will monitor those files more regularly. Cool
+        # files are monitored less often
+        self.hot_files = {}
+        self.max_hot   = 20 # The max files to check
+        self.hotness   = 4  # How many loops before checking cool files
+
         self.file_changed  = Event()
         self.dir_changed   = Event()
+        self.file_changed += self.handle_file_changed
+
         self.ignored_dirs  = re.compile("\.git", re.I)
         self.ignored_files = re.compile("\.swp$", re.I)
         self.track(root)
+
+
+    def handle_file_changed(self, path, event):
+        if event == "deleted":
+            if path in self.hot_files:
+                del self.hot_files[path]
+            return
+        self.hot_files[path] = self.files[path]
+        logging.debug("Adding hot file %s" % path)
+        if len(self.hot_files) > self.max_hot: #trim the oldest file
+            age = None
+            key = None
+            for path, mod in self.files.items():
+                if age is None or mod < age:
+                    key = path
+                    age = mod
+            del self.hot_files[key]
+            logging.debug("Removing hot file %s" % key)
 
 
     def track(self, source):
@@ -31,19 +62,33 @@ class FileMonitor(object):
     def should_ignore(self, path):
         path = os.path.abspath(path)
         if not os.path.exists(path):
-            logging.warn("ignored, path %s doesn't exist" % path)
             return True
         elif re.search(self.ignored_dirs, path):
-            logging.debug("ignored, path %s matches dir pattern" % path)
             return True
         elif os.path.isdir(path):
-            logging.debug("okay, path %s doesn't match dir pattern and is a directory" % path)
             return False
         elif re.search(self.ignored_files, path):
-            logging.debug("ignored, path %s matches file pattern" % path)
             return True
         else:
             return False 
+
+
+    def start(self):
+        loop = -1 
+        while True:
+            # Top files are checked most frequently
+            # All other files are checked less often
+            loop += 1
+            if loop > self.hotness or len(self.hot_files) == 0:
+                loop = 0
+                for path, modified in self.dirs.items():
+                    self.check_dir(path, modified)
+                for path, modified in self.files.items():
+                    self.check_file(path, modified)
+            else:
+                for path, modified in self.hot_files.items():
+                    self.check_file(path, modified)
+            time.sleep(self.delay)
 
 
     def add_dir(self, dir, trigger_event = False):
@@ -64,15 +109,6 @@ class FileMonitor(object):
         self.files[path] = os.stat(path).st_mtime
         if trigger_event:
             self.file_changed(path, 'added')
-
-
-    def start(self):
-        while True:
-            for path, modified in self.dirs.items():
-                self.check_dir(path, modified)
-            for path, modified in self.files.items():
-                self.check_file(path, modified)
-            time.sleep(self.delay)
 
 
     def check_file(self, path, last_modified):
