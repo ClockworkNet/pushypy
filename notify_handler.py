@@ -1,13 +1,18 @@
-import pynotify, logging
+import logging
+import notify
 
-# Used to show logger statements in a Linux notification window
-# @todo: Add support for other OSs, or at least degrade nicely
+def handle(logger, title):
+    handler = NotifyHandler(title)
+    handler.setLevel(logging.INFO)
+    logger.addHandler(handler)
+
+
+# Used to show logger statements in a notification window
 class NotifyHandler(logging.Handler):
     def __init__(self, title=''):
         logging.Handler.__init__(self)
         self.title = title
-        pynotify.init(self.title)
+        notify.init(self.title)
 
     def emit(self, record):
-        n = pynotify.Notification(self.title, record.msg)
-        n.show()
+        notify.send(self.title, record.msg)
