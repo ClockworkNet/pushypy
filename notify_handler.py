@@ -1,7 +1,7 @@
 import logging
 import notify
 
-def handle(logger, title):
+def register(logger, title):
     handler = NotifyHandler(title)
     handler.setLevel(logging.INFO)
     logger.addHandler(handler)

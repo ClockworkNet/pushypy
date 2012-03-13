@@ -8,7 +8,6 @@ from optparse       import OptionParser
 
 class Main(object):
     def __init__(self):
-
         options, args = self.parse_args()
         log_format    = "%(asctime)s - %(message)s"
         date_format   = "%b %d, %H:%M:%S"
@@ -16,32 +15,39 @@ class Main(object):
         logging.basicConfig(format=log_format, datefmt=date_format, level=options.log_level)
 
         # Add notifications
-        notify_handler.handle(logging.getLogger())
+        notify_handler.register(logging.getLogger(), "Pushy")
         
-        dir = os.path.abspath(options.source) if options.source is not None else './'
+        dir = os.path.abspath(options.source) if options.source else './'
 
         self.monitor = FileMonitor(dir)
 
-        if not options.ignored_dirs is None:
+        if options.ignored_dirs:
             self.ignored_dirs = re.compile(options.ignored_dirs, re.I)
-        if not options.ignored_files is None:
+        if options.ignored_files:
             self.ignored_files = re.compile(options.ignored_files, re.I)
 
-        self.monitor.delay         = options.delay if options.delay is not None else 1
+        self.monitor.delay         = options.delay if options.delay else 1
         self.monitor.file_changed += self.handle_change
         self.monitor.dir_changed  += self.handle_change
 
-        if options.target is not None:
+        if options.target:
             target = os.path.abspath(options.target)
-            if options.username is not None and options.hostname is not None:
+            if options.username and options.hostname:
                 self.pusher = SshPusher(dir, target, options.hostname, options.username)
             else:
                 self.pusher = Pusher(dir, target)
         else:
             print "You might want to specify a target directory. This script isn't very useful otherwise."
             self.pusher = None
-        self.monitor.start()
-        logging.info("Pushy started...")
+
+        logging.info("Pushy started.")
+        try:
+            self.monitor.start()
+        except (KeyboardInterrupt, SystemExit):
+            logging.info("Pushy stopped.")
+            sys.exit()
+        except:
+            raise
 
 
     def parse_args(self):
